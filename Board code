@@ -1,0 +1,113 @@
+Arduino board program
+#include <DHT.h>
+#include <Wire.h>
+
+#define DHTPIN 2     // Pin where the DHT22 is connected
+#define DHTTYPE DHT22 // Type of DHT sensor
+
+DHT dht(DHTPIN, DHTTYPE);
+
+#define SMOKE_PIN A0 // Pin where the MQ135 analog output is connected
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+}
+
+void loop() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  float smokeLevel = analogRead(SMOKE_PIN);
+  
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C, Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" %, Smoke Level: ");
+  Serial.println(smokeLevel);
+
+  delay(1000); // Adjust the delay as needed
+}
+
+
+ESP8266 program
+#include <DHT.h>
+#include <ESP8266WiFi.h>
+
+#define DHT_PIN 2          // DHT22 data pin connected to Arduino pin 2
+#define MQ_PIN A0          // MQ135 analog pin connected to Arduino analog pin A0
+#define LED_PIN 13         // Status LED pin
+
+// Replace these with your Wi-Fi credentials
+const char *ssid = "vivo 1807";
+const char *password = "123454321";
+
+DHT dht(DHT_PIN, DHT22);
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(LED_PIN, OUTPUT);
+
+  // Connect to Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
+
+  dht.begin();
+}
+
+void loop() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Failed to read from DHT sensor");
+  } else {
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println(" °C");
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.println(" %");
+  }
+
+  int smokeLevel = analogRead(MQ_PIN);
+  Serial.print("Smoke Level: ");
+  Serial.println(smokeLevel);
+
+  sendDataToServer(temperature, humidity, smokeLevel);
+
+  delay(15000); // Wait for 5 seconds before reading again
+}
+
+void sendDataToServer(float temperature, float humidity, int smokeLevel) {
+  // Replace with your server endpoint and parameters
+  const char *server = "api.thingspeak.com";
+  const char *apiKey = "7MXB08QVPGTIZ00X";
+
+  // Create a client object
+  WiFiClient client;
+  if (client.connect(server, 80)) {
+    // Send data to the server
+    client.print("GET /update?api_key=");
+    client.print(apiKey);
+    client.print("&field1=");
+    client.print(temperature);
+    client.print("&field2=");
+    client.print(humidity);
+    client.print("&field3=");
+    client.print(smokeLevel);
+    client.println(" HTTP/1.1");
+    client.print("Host: ");
+    client.println(server);
+    client.println("Connection: close");
+    client.println();
+    delay(10);
+    client.stop();
+  } else {
+    Serial.println("Failed to connect to server");
+}
+}
